@@ -1,0 +1,3406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Re:Antagon • Sapnis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Onest:wght@400;500;600;700&family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ==========================================================================
+       DESIGN TOKENS — PURE AMOLED BLACK + WHITE + AMBER (#ffc26f)
+       ========================================================================== */
+    :root {
+      --bg: #000000;
+      --surface: #080808;
+      --surface-elevated: #0e0e0e;
+      --fg: #ffffff;
+      --fg-muted: rgba(255, 255, 255, 0.56);
+      --fg-dim: rgba(255, 255, 255, 0.28);
+      --accent: #ffc26f;
+      --accent-soft: rgba(255, 194, 111, 0.14);
+      --accent-glow: rgba(255, 194, 111, 0.48);
+      --border: rgba(255, 255, 255, 0.12);
+      --border-strong: rgba(255, 255, 255, 0.22);
+      --ease-expo: cubic-bezier(0.76, 0, 0.24, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --tracker-width: 316px;
+      --fx-shift: 0px;
+      --font-display: 'Unbounded', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-body: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    @media (min-width: 1060px) {
+      body.tracker-visible {
+        --fx-shift: -166px;
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+    }
+
+    .accent {
+      color: var(--accent);
+    }
+
+    @keyframes softPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.84); }
+    }
+
+    /* ==========================================================================
+       MAIN STAGE & RESPONSIVE SHIFT WHEN TRACKER IS OPEN
+       ========================================================================== */
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 10;
+      transition: padding-right 0.55s var(--ease-out);
+      will-change: opacity, transform;
+    }
+
+    @media (min-width: 1060px) {
+      body.tracker-visible .scene {
+        padding-right: 364px;
+      }
+    }
+
+    .scene.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      z-index: 20;
+    }
+
+    /* Overflow-hidden text reveal masks */
+    .mask-clip {
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: bottom;
+    }
+
+    .mask-inner {
+      display: inline-block;
+      transform: translateY(115%);
+      transition: transform 0.72s var(--ease-out), opacity 0.45s ease;
+      will-change: transform;
+    }
+
+    .mask-inner.revealed {
+      transform: translateY(0%);
+    }
+
+    .mask-inner.swipe-up {
+      transform: translateY(-120%);
+      transition: transform 0.58s var(--ease-expo);
+    }
+
+    /* ==========================================================================
+       RIGHT-SIDE TRACKER PANEL (SYNCED WITH SCENES 2–7)
+       ========================================================================== */
+    .tracker-panel {
+      position: fixed;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%) translateX(0);
+      width: var(--tracker-width);
+      max-width: calc(100vw - 32px);
+      z-index: 40;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      opacity: 1;
+      transition:
+        transform 0.55s var(--ease-out),
+        opacity 0.4s ease,
+        border-color 0.35s ease,
+        box-shadow 0.35s ease;
+      will-change: transform, opacity;
+    }
+
+    @media (max-height: 670px) {
+      .tracker-panel {
+        top: 24px;
+        transform: translateY(0) translateX(0);
+      }
+      .tracker-panel.hidden {
+        transform: translateY(0) translateX(calc(100% + 48px));
+      }
+    }
+
+    .tracker-panel.hidden {
+      transform: translateY(-50%) translateX(calc(100% + 48px));
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .tracker-panel.highlight-ring {
+      border-color: rgba(255, 194, 111, 0.5);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.92), 0 0 32px rgba(255, 194, 111, 0.14);
+    }
+
+    .tracker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tracker-title {
+      margin: 0;
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tracker-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .tracker-fraction {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .tracker-collapse-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--fg-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .tracker-collapse-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* 6-Node Horizontal Stepper */
+    .tracker-stepper {
+      position: relative;
+      margin: 20px 2px;
+      padding: 0 2px;
+    }
+
+    .stepper-rail-bg {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      right: 12px;
+      height: 2px;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 99px;
+    }
+
+    .stepper-rail-fill {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      height: 2px;
+      width: 0%;
+      transform: translateY(-50%);
+      background: var(--accent);
+      border-radius: 99px;
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: width 0.45s var(--ease-out);
+    }
+
+    .stepper-nodes {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .step-node {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.22s var(--ease-out), background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .step-node:hover {
+      transform: scale(1.16);
+    }
+
+    .step-node.completed {
+      background: var(--accent);
+      border: 1.5px solid var(--accent);
+      color: #000000;
+    }
+
+    .step-node.active {
+      width: 26px;
+      height: 26px;
+      background: var(--accent);
+      border: 1.5px solid var(--accent);
+      color: #000000;
+      box-shadow: 0 0 0 4px rgba(255, 194, 111, 0.22), 0 0 18px rgba(255, 194, 111, 0.65);
+      animation: nodePulse 2.2s ease-in-out infinite;
+    }
+
+    .step-node.upcoming {
+      background: var(--surface);
+      border: 1.5px solid rgba(255, 255, 255, 0.24);
+      color: transparent;
+    }
+
+    @keyframes nodePulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(255, 194, 111, 0.22), 0 0 14px rgba(255, 194, 111, 0.55); }
+      50% { box-shadow: 0 0 0 8px rgba(255, 194, 111, 0.08), 0 0 24px rgba(255, 194, 111, 0.85); }
+    }
+
+    /* Phase Info Block */
+    .tracker-phase {
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .tracker-phase.switching {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    .tracker-phase-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 15.5px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+      line-height: 1.3;
+    }
+
+    .tracker-phase-desc {
+      margin: 6px 0 0 0;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--fg-muted);
+    }
+
+    /* Clickable Telemetry Strip */
+    .tracker-telemetry {
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px 8px;
+      margin: 0 -8px;
+      border-radius: 9px;
+      cursor: pointer;
+      background: transparent;
+      border: 0;
+      width: calc(100% + 16px);
+      text-align: left;
+      transition: background-color 0.2s ease;
+    }
+
+    .telemetry-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .telemetry-item.current {
+      background: rgba(255, 194, 111, 0.09);
+    }
+
+    .telemetry-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+
+    .telemetry-name {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .telemetry-val {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .telemetry-val.white {
+      color: var(--fg);
+    }
+
+    .telemetry-track {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .telemetry-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: var(--accent);
+    }
+
+    .telemetry-fill.white {
+      background: var(--fg);
+    }
+
+    /* Integrated Micro-Controls Row (Hideable with H) */
+    .tracker-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      max-height: 54px;
+      overflow: hidden;
+      opacity: 1;
+      transition:
+        max-height 0.35s var(--ease-out),
+        opacity 0.25s ease,
+        margin-top 0.35s ease,
+        padding-top 0.35s ease,
+        border-color 0.25s ease;
+    }
+
+    body.controls-hidden .tracker-controls {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+      padding-top: 0;
+      border-top-color: transparent;
+      pointer-events: none;
+    }
+
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 29px;
+      min-width: 29px;
+      padding: 0 9px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: rgba(255, 255, 255, 0.84);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 194, 111, 0.45);
+      color: var(--fg);
+    }
+
+    .ctrl-btn.active-auto {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000000;
+      font-weight: 600;
+    }
+
+    /* Subtle Reopen Tab on Right Edge when Tracker is Collapsed */
+    .tracker-reopen {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%) translateX(100%);
+      z-index: 38;
+      background: var(--surface);
+      border: 1px solid rgba(255, 194, 111, 0.32);
+      border-right: none;
+      border-radius: 12px 0 0 12px;
+      padding: 12px 9px;
+      color: rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.42s var(--ease-out), opacity 0.3s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .tracker-reopen.visible {
+      transform: translateY(-50%) translateX(0);
+      opacity: 0.82;
+      pointer-events: auto;
+    }
+
+    .tracker-reopen:hover {
+      opacity: 1;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    body.controls-hidden .tracker-reopen {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    /* ==========================================================================
+       SCENE 1 — ЗАГРУЗКА ("Re:Antagon" + Ring -> Dot)
+       ========================================================================== */
+    .s1-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    .s1-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 5.6vw, 4.35rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--fg);
+    }
+
+    .loader-box {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0.84);
+      transition: opacity 0.42s var(--ease-out), transform 0.52s var(--ease-out);
+    }
+
+    .loader-box.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .loader-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 12px rgba(255, 194, 111, 0.45));
+    }
+
+    .loader-track {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 2.4;
+    }
+
+    .loader-fill {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 2.6;
+      stroke-linecap: round;
+      stroke-dasharray: 282.743;
+      stroke-dashoffset: 282.743;
+    }
+
+    .loader-dot {
+      position: absolute;
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: #ffffff;
+      transform: scale(0);
+      opacity: 0;
+      transition: transform 0.45s var(--ease-expo), opacity 0.25s ease, box-shadow 0.35s ease;
+    }
+
+    .loader-dot.solid {
+      transform: scale(1);
+      opacity: 1;
+      box-shadow: 0 0 36px rgba(255, 194, 111, 0.55);
+    }
+
+    .loader-dot.compact {
+      transform: scale(0.2);
+      opacity: 1;
+      background: #ffffff;
+      box-shadow: 0 0 32px rgba(255, 194, 111, 0.9);
+    }
+
+    /* ==========================================================================
+       SCENE 2 — МИР (TYPEWRITER + OBSIDIAN TOPOGRAPHIC MAP + 74% / 5.5K SPECS)
+       ========================================================================== */
+    .s2-typewriter {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 14px;
+      transition: opacity 0.48s var(--ease-expo), transform 0.56s var(--ease-expo);
+    }
+
+    .s2-typewriter.exit-up {
+      opacity: 0;
+      transform: translateY(-28px);
+      pointer-events: none;
+    }
+
+    .tw-line-1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.9rem, 4.5vw, 3.35rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      min-height: 1.3em;
+      color: var(--fg);
+    }
+
+    .tw-line-2 {
+      font-family: var(--font-display);
+      font-size: clamp(0.95rem, 2.05vw, 1.5rem);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      min-height: 1.4em;
+      color: var(--fg-muted);
+      max-width: 92vw;
+    }
+
+    .tw-line-3 {
+      font-family: var(--font-display);
+      font-size: clamp(0.85rem, 1.65vw, 1.15rem);
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      min-height: 1.3em;
+      color: var(--accent);
+      opacity: 0.9;
+    }
+
+    .tw-cursor {
+      display: inline-block;
+      width: 0.45em;
+      height: 1em;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+      vertical-align: -0.14em;
+      margin-left: 5px;
+      animation: blink 0.7s steps(2, start) infinite;
+    }
+
+    .tw-cursor.off {
+      display: none;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .s2-world {
+      position: absolute;
+      width: min(92%, 780px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      opacity: 0;
+      transform: scale(0.95) translateY(16px);
+      pointer-events: none;
+      transition: opacity 0.7s var(--ease-out), transform 0.78s var(--ease-out);
+    }
+
+    .s2-world.revealed {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+    }
+
+    .map-caption {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .map-caption-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    .map-viewport {
+      position: relative;
+      width: min(100%, 540px, calc(46vh * 1.333));
+      aspect-ratio: 4 / 3;
+      background: #000000;
+      border: 1px solid rgba(255, 194, 111, 0.16);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 54px rgba(0, 0, 0, 0.92), inset 0 0 42px rgba(255, 194, 111, 0.04);
+    }
+
+    .map-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .map-radar-pulse {
+      transform-origin: 505px 310px;
+      animation: radarPulse 5.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+
+    @keyframes radarPulse {
+      0% { transform: scale(0.18); opacity: 0.48; }
+      70% { opacity: 0.12; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+
+    .map-scanline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 4%, rgba(255, 194, 111, 0.72) 50%, transparent 96%);
+      box-shadow: 0 0 18px rgba(255, 194, 111, 0.55);
+      pointer-events: none;
+      animation: mapScan 5.2s linear infinite;
+    }
+
+    @keyframes mapScan {
+      0% { top: -2%; opacity: 0; }
+      8% { opacity: 1; }
+      92% { opacity: 1; }
+      100% { top: 102%; opacity: 0; }
+    }
+
+    /* Interactive Smooth Vector Crosses with "(???)" Hover Tooltip */
+    .map-cross {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 6;
+      outline: none;
+    }
+
+    .map-cross-svg {
+      width: 12px;
+      height: 12px;
+      filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.95));
+      transition: transform 0.22s var(--ease-out), filter 0.22s ease;
+      animation: crossPulse 2.6s ease-in-out infinite;
+    }
+
+    @keyframes crossPulse {
+      0%, 100% { opacity: 0.92; }
+      50% { opacity: 0.52; }
+    }
+
+    .map-cross:hover .map-cross-svg,
+    .map-cross:focus-visible .map-cross-svg,
+    .map-cross.open .map-cross-svg {
+      opacity: 1;
+      animation: none;
+      transform: scale(1.32);
+      filter: drop-shadow(0 0 8px rgba(255, 194, 111, 0.9));
+    }
+
+    .map-cross-tip {
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px) scale(0.92);
+      padding: 3px 8px;
+      background: rgba(6, 6, 6, 0.96);
+      border: 1px solid rgba(255, 194, 111, 0.72);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.95), 0 0 12px rgba(255, 194, 111, 0.22);
+      transition: opacity 0.2s ease, transform 0.22s var(--ease-out);
+    }
+
+    .map-cross:hover .map-cross-tip,
+    .map-cross:focus-visible .map-cross-tip,
+    .map-cross.open .map-cross-tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    .map-stamp {
+      position: absolute;
+      bottom: 10px;
+      left: 14px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: rgba(255, 255, 255, 0.42);
+      pointer-events: none;
+    }
+
+    .world-specs {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 820px) {
+      .world-specs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .spec-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 11px 13px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 4px;
+      transition: border-color 0.25s ease;
+    }
+
+    .spec-box:hover {
+      border-color: rgba(255, 194, 111, 0.36);
+    }
+
+    .spec-row-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .spec-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+    }
+
+    .spec-value {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--fg);
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+
+    .spec-sub {
+      font-size: 11px;
+      color: var(--fg-dim);
+      line-height: 1.35;
+    }
+
+    .feature-islands {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-top: 2px;
+      font-size: 10.5px;
+      color: rgba(255, 255, 255, 0.82);
+      line-height: 1.35;
+    }
+
+    .feature-islands .mystery {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Server Status Strip (Displayed on Scene 3 — Page 2 of Tracker) */
+    .server-status-card {
+      width: 100%;
+      margin-top: 28px;
+      background: var(--surface);
+      border: 1px solid rgba(255, 194, 111, 0.28);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.65s var(--ease-out), transform 0.65s var(--ease-out);
+    }
+
+    .server-status-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 760px) {
+      .server-status-card {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .server-stat-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+    }
+
+    .server-stat-cell:last-child {
+      border-right: none;
+      padding-right: 0;
+    }
+
+    @media (max-width: 760px) {
+      .server-stat-cell {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding-right: 0;
+        padding-bottom: 8px;
+      }
+      .server-stat-cell:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+    }
+
+    .status-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: softPulse 1.8s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .status-tag {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .status-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+      line-height: 1.35;
+    }
+
+    /* ==========================================================================
+       SHARED LINEAR PROGRESS BARS (SCENES 2, 3, 4, 5)
+       ========================================================================== */
+    .bar-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      position: relative;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(255, 194, 111, 0.65) 0%, var(--accent) 100%);
+      border-radius: 99px;
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+
+    .bar-fill.pulse-tip::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    /* ==========================================================================
+       SCENES 3 & 4 — КАСТОМНЫЙ КОНТЕНТ (65%) & МЕДИА (41%)
+       ========================================================================== */
+    .metric-container {
+      width: min(100%, 640px);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .scene-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .scene-h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(1.85rem, 4.4vw, 3.15rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      color: var(--fg);
+    }
+
+    .scene-sub {
+      margin: 14px 0 0 0;
+      font-size: clamp(1rem, 2.2vw, 1.35rem);
+      font-weight: 400;
+      color: var(--fg-muted);
+      line-height: 1.45;
+    }
+
+    .media-heading-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .media-live-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 16px var(--accent);
+      animation: softPulse 1.8s ease-in-out infinite;
+    }
+
+    .progress-block {
+      width: 100%;
+      margin-top: 34px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+    }
+
+    .progress-block.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .progress-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .progress-label {
+      font-size: 13px;
+      color: var(--fg-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .progress-number {
+      margin-left: 8px;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .progress-ratio {
+      font-size: 12px;
+      color: var(--fg-dim);
+    }
+
+    /* ==========================================================================
+       SCENE 5 — ЧТО ВАС СКОРО ЖДЁТ (2x2 GRID + 57% SERVER READINESS)
+       ========================================================================== */
+    .s5-wrap {
+      width: min(100%, 720px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .s5-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .cards-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 640px) {
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(20px) scale(0.97);
+      transition:
+        opacity 0.55s var(--ease-out),
+        transform 0.55s var(--ease-out),
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+    }
+
+    .feature-card.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .feature-card.focused,
+    .feature-card:hover {
+      border-color: rgba(255, 194, 111, 0.52);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75), 0 0 22px rgba(255, 194, 111, 0.08);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-icon.amber {
+      background: var(--accent-soft);
+      border-color: rgba(255, 194, 111, 0.35);
+      color: var(--accent);
+    }
+
+    .card-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .feature-card.focused .card-dot,
+    .feature-card:hover .card-dot {
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    .card-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+    }
+
+    .card-desc {
+      margin: 5px 0 0 0;
+      font-size: 12.5px;
+      color: var(--fg-muted);
+      line-height: 1.45;
+    }
+
+    .card-author {
+      margin: 10px 0 0 0;
+      font-size: 11.5px;
+      color: var(--fg-dim);
+    }
+
+    .server-fill-card {
+      width: 100%;
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid rgba(255, 194, 111, 0.3);
+      border-radius: 14px;
+      padding: 14px 18px;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+    }
+
+    .server-fill-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .server-fill-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .server-fill-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .server-fill-pct {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* ==========================================================================
+       SCENE 6 — СВОДКА ГОТОВНОСТИ (3 RINGS + 57% PILL)
+       ========================================================================== */
+    .s6-wrap {
+      width: min(100%, 720px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .s6-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .rings-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    @media (max-width: 680px) {
+      .rings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ring-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+      transition:
+        opacity 0.6s var(--ease-out),
+        transform 0.6s var(--ease-out),
+        border-color 0.25s ease;
+    }
+
+    .ring-card.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .ring-card:hover {
+      border-color: rgba(255, 194, 111, 0.5);
+    }
+
+    .ring-box {
+      position: relative;
+      width: 108px;
+      height: 108px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .ring-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 4;
+    }
+
+    .ring-fg {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 4.4;
+      stroke-linecap: round;
+      stroke-dasharray: 282.743;
+      stroke-dashoffset: 282.743;
+      filter: drop-shadow(0 0 8px rgba(255, 194, 111, 0.45));
+    }
+
+    .ring-fg.white {
+      stroke: #ffffff;
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.32));
+    }
+
+    .ring-val {
+      position: absolute;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .ring-val.white {
+      color: var(--fg);
+    }
+
+    .ring-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+    }
+
+    .ring-sub {
+      margin: 5px 0 0 0;
+      font-size: 11px;
+      color: var(--fg-dim);
+    }
+
+    .s6-capacity-pill {
+      margin-top: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--surface);
+      border: 1px solid rgba(255, 194, 111, 0.35);
+      border-radius: 999px;
+      color: var(--fg);
+      font-size: 12.5px;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.55s var(--ease-out), transform 0.55s var(--ease-out), border-color 0.25s ease;
+    }
+
+    .s6-capacity-pill.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .s6-capacity-pill:hover {
+      border-color: var(--accent);
+    }
+
+    /* ==========================================================================
+       SCENE 7 — ФИНАЛ ("ANTAGON: REBORN" + "19 декабря")
+       ========================================================================== */
+    .s7-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    @keyframes rebornGradientFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .s7-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(2.1rem, 5.6vw, 4.25rem);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      background: linear-gradient(
+        110deg,
+        #ffffff 0%,
+        #ffffff 24%,
+        #ffc26f 48%,
+        #ff9a3c 62%,
+        #ffffff 84%,
+        #ffc26f 100%
+      );
+      background-size: 240% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 22px rgba(255, 194, 111, 0.24));
+      animation: rebornGradientFlow 4.6s ease-in-out infinite;
+    }
+
+    .s7-sub {
+      margin: 18px 0 0 0;
+      font-size: clamp(1rem, 2.2vw, 1.45rem);
+      font-weight: 600;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+    }
+
+    .s7-sub.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .s7-dot-btn {
+      margin-top: 34px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 194, 111, 0.28);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transform: scale(0.7);
+      transition: opacity 0.6s ease, transform 0.6s var(--ease-out), border-color 0.25s ease;
+    }
+
+    .s7-dot-btn.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .s7-dot-btn:hover {
+      border-color: var(--accent);
+      transform: scale(1.12);
+    }
+
+    .s7-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 16px var(--accent);
+      animation: softPulse 2s ease-in-out infinite;
+    }
+
+    /* ==========================================================================
+       MORPHING TRANSITION FX OVERLAYS
+       ========================================================================== */
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .fx-radial {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 22px;
+      height: 22px;
+      margin: -11px 0 0 -11px;
+      border-radius: 50%;
+      background: #ffffff;
+      opacity: 0;
+      transform: scale(0);
+      will-change: transform, opacity;
+    }
+
+    .fx-scanner {
+      position: absolute;
+      inset: 0;
+      background: #000000;
+      border-left: 2px solid var(--accent);
+      box-shadow: -16px 0 42px rgba(255, 194, 111, 0.45);
+      opacity: 0;
+      transform: translateX(105%);
+      will-change: transform;
+    }
+
+    .fx-morph-line {
+      position: absolute;
+      top: 50%;
+      left: calc(50% + var(--fx-shift));
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 24px var(--accent-glow);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0);
+      will-change: width, height, transform, opacity;
+    }
+
+    .fx-dots {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateX(var(--fx-shift));
+      opacity: 0;
+    }
+
+    .fx-dot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 1px solid rgba(255, 194, 111, 0.85);
+      box-shadow: 0 0 16px rgba(255, 194, 111, 0.45);
+      will-change: transform, width, height, border-radius, opacity;
+    }
+
+    .fx-rings {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateX(var(--fx-shift));
+      opacity: 0;
+    }
+
+    .fx-ring {
+      position: absolute;
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 22px rgba(255, 194, 111, 0.35);
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .fx-ring.white {
+      border-color: #ffffff;
+      box-shadow: 0 0 18px rgba(255, 255, 255, 0.3);
+    }
+
+    .fx-pulse-ring {
+      position: absolute;
+      top: 50%;
+      left: calc(50% + var(--fx-shift));
+      width: 48px;
+      height: 48px;
+      margin: -24px 0 0 -24px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 26px var(--accent-glow);
+      opacity: 0;
+      transform: scale(0.4);
+      will-change: transform, opacity;
+    }
+
+    /* ==========================================================================
+       NON-INTRUSIVE TOAST NOTIFICATION
+       ========================================================================== */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(14px);
+      z-index: 70;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(10, 10, 10, 0.94);
+      border: 1px solid rgba(255, 194, 111, 0.38);
+      color: var(--fg);
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s var(--ease-out);
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================
+       1. MAIN FULLSCREEN STAGE (7 SCENES)
+       ======================================================================== -->
+  <main id="stage" class="stage">
+
+    <!-- SCENE 1: ЗАГРУЗКА ("Re:Antagon" + Ring -> Dot) -->
+    <section id="scene-1" class="scene" data-scene="1">
+      <div class="s1-wrap">
+        <div class="mask-clip">
+          <h1 id="s1-title" class="s1-title mask-inner">Re<span class="accent">:</span>Antagon</h1>
+        </div>
+        <div id="s1-loader" class="loader-box">
+          <svg class="loader-svg" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="loader-track" cx="50" cy="50" r="45"></circle>
+            <circle id="s1-ring" class="loader-fill" cx="50" cy="50" r="45"></circle>
+          </svg>
+          <div id="s1-dot" class="loader-dot"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 2: МИР (TYPEWRITER + OBSIDIAN TOPOGRAPHIC MAP + 74% / 5.5K / ОСОБЕННОСТИ) -->
+    <section id="scene-2" class="scene" data-scene="2">
+      <div id="s2-typewriter" class="s2-typewriter">
+        <div class="tw-line-1">
+          <span id="s2-line-1"></span><span id="s2-cur-1" class="tw-cursor"></span>
+        </div>
+        <div class="tw-line-2">
+          <span id="s2-line-2"></span><span id="s2-cur-2" class="tw-cursor off"></span>
+        </div>
+        <div class="tw-line-3">
+          <span id="s2-line-3"></span><span id="s2-cur-3" class="tw-cursor off"></span>
+        </div>
+      </div>
+
+      <div id="s2-world" class="s2-world">
+        <div class="map-caption mono">
+          <span class="map-caption-dot"></span>
+          <span>Глобальная карта мира</span>
+        </div>
+
+        <div class="map-viewport">
+          <!-- Obsidian Topographic Cartography — Layered AMOLED Continent Map -->
+          <svg class="map-svg" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Глобальная карта континента Antagon: Sapnis">
+            <defs>
+              <!-- Ambient deep-space cartographic spotlight -->
+              <radialGradient id="map-bg-glow" cx="54%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ffc26f" stop-opacity="0.09" />
+                <stop offset="48%" stop-color="#17171a" stop-opacity="0.14" />
+                <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+              </radialGradient>
+
+              <!-- Base Obsidian Terrain Fill -->
+              <linearGradient id="land-base" x1="14%" y1="12%" x2="86%" y2="88%">
+                <stop offset="0%" stop-color="#222124" />
+                <stop offset="42%" stop-color="#151518" />
+                <stop offset="76%" stop-color="#0e0e11" />
+                <stop offset="100%" stop-color="#08080a" />
+              </linearGradient>
+
+              <!-- Tactile diagonal cartographic hatch pattern for landmass -->
+              <pattern id="terrain-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+                <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,255,255,0.045)" stroke-width="1" />
+              </pattern>
+
+              <!-- Warm amber micro-dot texture for northern desert/mesa highlands -->
+              <pattern id="desert-dots" width="7" height="7" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="0.85" fill="#ffc26f" fill-opacity="0.34" />
+                <circle cx="5.5" cy="5.5" r="0.55" fill="#ffc26f" fill-opacity="0.18" />
+              </pattern>
+
+              <!-- Cool silver micro-contour lines for glacial zones -->
+              <pattern id="glacier-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+                <line x1="0" y1="0" x2="0" y2="9" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
+              </pattern>
+
+              <!-- Biome atmospheric washes -->
+              <radialGradient id="biome-north" cx="52%" cy="16%" r="25%">
+                <stop offset="0%" stop-color="#ffc26f" stop-opacity="0.24" />
+                <stop offset="60%" stop-color="#ffc26f" stop-opacity="0.06" />
+                <stop offset="100%" stop-color="#ffc26f" stop-opacity="0" />
+              </radialGradient>
+
+              <radialGradient id="biome-south" cx="50%" cy="86%" r="21%">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15" />
+                <stop offset="62%" stop-color="#ffffff" stop-opacity="0.03" />
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+              </radialGradient>
+
+              <radialGradient id="relief-east" cx="80%" cy="60%" r="34%">
+                <stop offset="0%" stop-color="#030304" stop-opacity="0.82" />
+                <stop offset="60%" stop-color="#09090b" stop-opacity="0.4" />
+                <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+              </radialGradient>
+
+              <!-- Crisp luminous amber coastline halo -->
+              <filter id="coast-glow" x="-12%" y="-12%" width="124%" height="124%">
+                <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ffc26f" flood-opacity="0.24" />
+              </filter>
+
+              <filter id="soft-relief" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="10" />
+              </filter>
+
+              <!-- Main Continent Silhouette Path -->
+              <path id="main-continent-shape" d="
+                M 358,64
+                C 365,42 378,24 398,21
+                C 414,19 426,27 438,20
+                C 452,13 472,18 488,30
+                C 502,41 516,54 534,54
+                C 550,54 562,48 576,55
+                C 588,61 600,56 616,62
+                C 634,68 648,79 664,78
+                C 678,77 686,92 681,108
+                C 676,122 684,138 683,154
+                C 682,168 692,178 684,188
+                C 674,199 656,204 636,205
+                C 618,206 604,218 594,234
+                C 608,225 628,218 652,216
+                C 672,214 688,224 699,240
+                C 710,256 714,276 721,294
+                C 728,312 729,332 732,348
+                C 734,358 724,364 714,364
+                C 726,370 738,376 734,390
+                C 730,404 716,416 698,424
+                C 684,430 672,416 664,404
+                C 654,390 634,386 614,392
+                C 602,396 594,404 598,408
+                C 614,404 634,404 648,412
+                C 662,420 666,440 672,458
+                C 678,476 680,496 670,514
+                C 660,532 646,548 634,562
+                C 622,575 604,580 590,572
+                C 576,564 568,546 562,526
+                C 556,508 544,496 532,482
+                C 520,468 508,454 502,456
+                C 504,474 514,496 518,518
+                C 522,540 526,564 516,576
+                C 506,588 486,588 470,582
+                C 454,576 442,566 444,552
+                C 446,538 458,524 456,506
+                C 454,488 450,468 446,448
+                C 442,428 432,414 414,400
+                C 396,386 376,368 354,354
+                C 334,342 316,338 300,346
+                C 288,352 276,342 264,328
+                C 250,312 228,300 218,288
+                C 214,282 228,278 242,282
+                C 258,286 276,298 294,298
+                C 312,298 332,290 344,282
+                C 334,272 322,262 326,254
+                C 330,248 352,252 366,248
+                C 356,236 336,222 332,204
+                C 328,188 342,172 362,168
+                C 380,164 398,176 410,188
+                C 414,182 406,166 392,158
+                C 376,150 352,154 334,162
+                C 326,154 338,144 356,140
+                C 374,136 390,136 392,124
+                C 394,112 376,104 360,112
+                C 344,120 326,142 310,152
+                C 300,158 298,140 306,124
+                C 314,108 330,98 344,96
+                C 348,84 352,74 358,64 Z
+              " />
+
+              <!-- SW Island Path -->
+              <path id="sw-island-shape" d="
+                M 210,384
+                C 226,378 248,388 268,404
+                C 288,420 308,442 308,458
+                C 308,472 290,478 272,472
+                C 252,464 234,446 220,426
+                C 208,410 200,390 210,384 Z
+              " />
+
+              <!-- NW Archipelago Path -->
+              <path id="nw-archipelago-shape" d="
+                M 76,82
+                C 82,102 88,128 100,148
+                C 110,164 128,166 148,168
+                C 170,170 194,180 206,200
+                C 216,216 218,238 206,252
+                C 198,260 186,260 184,248
+                C 182,232 186,214 174,202
+                C 160,188 136,184 114,174
+                C 94,164 82,138 74,114
+                C 70,100 72,88 76,82 Z
+              " />
+
+              <!-- Clip Paths -->
+              <clipPath id="continent-clip">
+                <use href="#main-continent-shape" />
+              </clipPath>
+              <clipPath id="sw-island-clip">
+                <use href="#sw-island-shape" />
+              </clipPath>
+            </defs>
+
+            <!-- Pure AMOLED Black Base + Subtle Ambient Glow -->
+            <rect width="800" height="600" fill="#000000" />
+            <rect width="800" height="600" fill="url(#map-bg-glow)" />
+
+            <!-- Minimalist Cartographic Grid -->
+            <g stroke="rgba(255,255,255,0.032)" stroke-width="1">
+              <line x1="200" y1="0" x2="200" y2="600" stroke-dasharray="3 6" />
+              <line x1="400" y1="0" x2="400" y2="600" stroke-dasharray="3 6" />
+              <line x1="600" y1="0" x2="600" y2="600" stroke-dasharray="3 6" />
+              <line x1="0" y1="150" x2="800" y2="150" stroke-dasharray="3 6" />
+              <line x1="0" y1="300" x2="800" y2="300" stroke-dasharray="3 6" />
+              <line x1="0" y1="450" x2="800" y2="450" stroke-dasharray="3 6" />
+            </g>
+
+            <!-- Expanding Subtle Topographic Radar Ring -->
+            <circle class="map-radar-pulse" cx="505" cy="310" r="145" fill="none" stroke="#ffc26f" stroke-width="1" />
+
+            <!-- Bathymetric Ocean Depth Echo Contours (Outer Shallows) -->
+            <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+              <use href="#main-continent-shape" stroke="rgba(255,194,111,0.055)" stroke-width="26" />
+              <use href="#main-continent-shape" stroke="#000000" stroke-width="23" />
+              <use href="#main-continent-shape" stroke="rgba(255,194,111,0.11)" stroke-width="12" />
+              <use href="#main-continent-shape" stroke="#000000" stroke-width="9.5" />
+
+              <use href="#sw-island-shape" stroke="rgba(255,194,111,0.08)" stroke-width="14" />
+              <use href="#sw-island-shape" stroke="#000000" stroke-width="11" />
+
+              <use href="#nw-archipelago-shape" stroke="rgba(255,194,111,0.07)" stroke-width="12" />
+              <use href="#nw-archipelago-shape" stroke="#000000" stroke-width="9.5" />
+            </g>
+
+            <!-- 1. NW Curved Archipelago Chain -->
+            <g filter="url(#coast-glow)">
+              <use href="#nw-archipelago-shape" fill="url(#land-base)" />
+              <use href="#nw-archipelago-shape" fill="url(#terrain-hatch)" />
+              <use href="#nw-archipelago-shape" fill="none" stroke="rgba(255,194,111,0.52)" stroke-width="1.35" stroke-linejoin="round" />
+              <!-- Lower parallel ridge & tiny islets -->
+              <path d="M 110,194 C 128,192 150,196 164,208 C 152,212 132,208 114,202 Z" fill="#18181b" stroke="rgba(255,194,111,0.42)" stroke-width="1.1" />
+              <ellipse cx="168" cy="288" rx="5.5" ry="9" transform="rotate(-12 168 288)" fill="#18181b" stroke="rgba(255,194,111,0.4)" stroke-width="1" />
+              <ellipse cx="176" cy="316" rx="4" ry="6.5" transform="rotate(8 176 316)" fill="#18181b" stroke="rgba(255,194,111,0.36)" stroke-width="1" />
+              <circle cx="184" cy="336" r="3" fill="#1b1b1e" stroke="rgba(255,194,111,0.36)" stroke-width="0.9" />
+              <circle cx="218" cy="264" r="4.5" fill="#1b1b1e" stroke="rgba(255,194,111,0.4)" stroke-width="1" />
+              <circle cx="712" cy="442" r="8.5" fill="#141417" stroke="rgba(255,194,111,0.42)" stroke-width="1.1" />
+            </g>
+
+            <!-- 2. SW Tilted Oval Glacial Island -->
+            <g filter="url(#coast-glow)">
+              <use href="#sw-island-shape" fill="url(#land-base)" />
+              <g clip-path="url(#sw-island-clip)">
+                <rect x="190" y="370" width="135" height="120" fill="url(#glacier-hatch)" opacity="0.65" />
+                <ellipse cx="256" cy="428" rx="32" ry="16" transform="rotate(36 256 428)" fill="rgba(255,255,255,0.11)" filter="url(#soft-relief)" />
+                <ellipse cx="258" cy="430" rx="22" ry="10" transform="rotate(36 258 430)" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.9" />
+              </g>
+              <use href="#sw-island-shape" fill="none" stroke="rgba(255,255,255,0.52)" stroke-width="1.35" />
+              <circle cx="196" cy="378" r="2.8" fill="#202024" stroke="rgba(255,255,255,0.36)" stroke-width="0.9" />
+              <circle cx="322" cy="468" r="3.4" fill="#202024" stroke="rgba(255,255,255,0.36)" stroke-width="0.9" />
+            </g>
+
+            <!-- 3. Main Continent Body -->
+            <use href="#main-continent-shape" fill="url(#land-base)" filter="url(#coast-glow)" />
+
+            <!-- Interior Topographic Plateaus, Textures & Rivers -->
+            <g clip-path="url(#continent-clip)">
+              <!-- Tactile diagonal landmass hatch -->
+              <rect width="800" height="600" fill="url(#terrain-hatch)" />
+
+              <!-- Biome Atmospheric Washes -->
+              <rect width="800" height="600" fill="url(#biome-north)" />
+              <rect width="800" height="600" fill="url(#relief-east)" />
+              <rect width="800" height="600" fill="url(#biome-south)" />
+
+              <!-- Northern Desert/Mesa Amber Stipple Plateau -->
+              <path d="M 350,20 L 650,35 C 668,95 628,162 554,174 C 482,186 410,164 364,122 Z" fill="url(#desert-dots)" />
+
+              <!-- Southern Glacial Ice Shelf Pattern -->
+              <path d="M 435,452 C 474,438 518,452 528,496 L 535,595 L 430,595 Z" fill="url(#glacier-hatch)" opacity="0.7" />
+
+              <!-- Stepped Obsidian Elevation Plateaus -->
+              <path d="M 382,102 C 446,66 566,76 624,126 C 674,170 658,238 594,264 C 522,294 426,262 384,202 C 354,160 352,118 382,102 Z" fill="rgba(255,255,255,0.028)" stroke="rgba(255,194,111,0.16)" stroke-width="0.9" />
+              <path d="M 426,126 C 474,104 548,112 584,148 C 612,176 594,218 548,232 C 494,248 434,224 414,184 C 400,156 404,136 426,126 Z" fill="rgba(255,194,111,0.035)" stroke="rgba(255,194,111,0.22)" stroke-width="0.85" />
+
+              <path d="M 442,274 C 514,250 612,272 648,334 C 676,384 624,450 546,456 C 472,462 418,408 412,346 C 408,306 418,282 442,274 Z" fill="rgba(0,0,0,0.28)" stroke="rgba(255,255,255,0.09)" stroke-width="0.9" />
+              <path d="M 484,302 C 534,288 594,304 612,346 C 626,380 588,418 538,420 C 488,422 456,388 456,348 C 456,322 466,308 484,302 Z" fill="rgba(0,0,0,0.34)" stroke="rgba(255,255,255,0.07)" stroke-width="0.8" />
+
+              <!-- SE Deep Canyon Terraces -->
+              <path d="M 552,432 C 608,424 666,462 652,518 C 638,568 572,564 544,508 Z" fill="#060608" opacity="0.68" stroke="rgba(255,194,111,0.12)" stroke-width="0.85" />
+              <path d="M 476,472 C 502,466 516,506 508,548 C 500,572 472,570 466,542 C 462,512 462,478 476,472 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.18)" stroke-width="0.85" />
+
+              <!-- Etched River Canyons -->
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <g stroke="rgba(255,194,111,0.22)">
+                  <path d="M 412,188 C 436,210 456,238 470,278 C 482,312 512,338 504,386 C 498,424 516,456 510,502" stroke-width="4.4" />
+                  <path d="M 594,234 C 566,258 552,292 566,330 C 580,368 604,394 622,438" stroke-width="3.8" />
+                </g>
+                <g stroke="#000000" opacity="0.95">
+                  <path d="M 412,188 C 436,210 456,238 470,278 C 482,312 512,338 504,386 C 498,424 516,456 510,502" stroke-width="2.6" />
+                  <path d="M 594,234 C 566,258 552,292 566,330 C 580,368 604,394 622,438" stroke-width="2.2" />
+                  <path d="M 470,278 C 438,292 408,314 378,342" stroke-width="1.8" />
+                  <path d="M 504,344 C 542,340 584,328 628,334" stroke-width="1.6" />
+                  <path d="M 468,68 C 458,108 440,142 414,174" stroke-width="1.7" />
+                  <path d="M 564,88 C 546,128 524,164 538,204 C 546,226 572,232 594,234" stroke-width="1.6" />
+                  <path d="M 504,386 C 476,406 456,424 440,446" stroke-width="1.5" />
+                  <path d="M 526,458 C 556,472 574,504 584,548" stroke-width="1.6" />
+                </g>
+              </g>
+
+              <!-- Distinctive Small Inland Lake -->
+              <ellipse cx="566" cy="352" rx="10.5" ry="3.4" transform="rotate(6 566 352)" fill="#000000" stroke="rgba(255,194,111,0.55)" stroke-width="1" />
+            </g>
+
+            <!-- Crisp Luminous Continent Coastline Rim -->
+            <use href="#main-continent-shape" fill="none" stroke="rgba(255,194,111,0.62)" stroke-width="1.5" stroke-linejoin="round" />
+
+            <!-- Distinctive Internal NW Bay Cutout & Inner Islet -->
+            <path d="M 358,122 C 374,116 392,120 390,138 C 388,150 368,154 354,146 C 344,140 346,128 358,122 Z" fill="#000000" stroke="rgba(255,194,111,0.45)" stroke-width="1.1" />
+            <ellipse cx="372" cy="135" rx="9" ry="7" fill="#1a1a1d" stroke="rgba(255,194,111,0.4)" stroke-width="0.95" />
+
+            <!-- Minimalist Tactical Corner Brackets & Compass Mark -->
+            <g stroke="rgba(255,194,111,0.34)" stroke-width="1.2" fill="none">
+              <path d="M 18,32 L 18,18 L 32,18" />
+              <path d="M 768,18 L 782,18 L 782,32" />
+              <path d="M 18,568 L 18,582 L 32,582" />
+              <path d="M 768,582 L 782,582 L 782,568" />
+            </g>
+            <g transform="translate(748, 52)" opacity="0.72">
+              <circle cx="0" cy="0" r="14" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="0.9" />
+              <path d="M 0,-11 L 3,0 L 0,-2 L -3,0 Z" fill="#ffc26f" />
+              <path d="M 0,11 L 2.2,0 L 0,2 L -2.2,0 Z" fill="rgba(255,255,255,0.32)" />
+              <text x="0" y="-17" text-anchor="middle" fill="#ffc26f" font-family="JetBrains Mono, monospace" font-size="8" font-weight="600">N</text>
+            </g>
+          </svg>
+
+          <!-- Animated Scanline -->
+          <div class="map-scanline"></div>
+
+          <!-- Interactive Smooth Crosses ("(???)" on hover / tap) -->
+          <button type="button" class="map-cross" style="left: 20.5%; top: 31.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 55.5%; top: 18.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 79.5%; top: 53.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 32.5%; top: 71.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 60.5%; top: 85.0%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 74.5%; top: 77.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <button type="button" class="map-cross" style="left: 44.0%; top: 47.5%;" data-interactive="true" aria-label="Неизвестная точка">
+            <svg class="map-cross-svg" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="#ffc26f" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="map-cross-tip mono">(???)</span>
+          </button>
+
+          <div class="map-stamp mono">
+            <span class="accent">5.5k</span> × <span class="accent">5.5k</span> // SAPNIS
+          </div>
+        </div>
+
+        <!-- World Specs Strip -->
+        <div class="world-specs">
+          <div class="spec-box">
+            <div class="spec-row-top">
+              <span class="spec-label mono">Готовность мира</span>
+              <span id="s2-counter" class="mono accent" style="font-size: 14px; font-weight: 700;">0%</span>
+            </div>
+            <div class="bar-track" style="margin: 6px 0;">
+              <div id="s2-bar" class="bar-fill"></div>
+            </div>
+            <span class="spec-sub mono">74 / 100</span>
+          </div>
+
+          <div class="spec-box">
+            <span class="spec-label mono">Диаметр мира</span>
+            <div class="spec-value mono accent">5.5k блоков</div>
+            <span class="spec-sub mono">5 500 × 5 500</span>
+          </div>
+
+          <div class="spec-box">
+            <span class="spec-label mono">Биомы</span>
+            <div class="spec-value" style="font-size: 14px;">Все основные биомы</div>
+            <span class="spec-sub">Пустыни • Леса • Горы • Ледники</span>
+          </div>
+
+          <div class="spec-box">
+            <span class="spec-label mono">Особенности</span>
+            <div class="feature-islands mono">
+              <span>Серный атолл <span class="mystery">(???)</span></span>
+              <span>Осенний край <span class="mystery">(???)</span></span>
+              <span>Топкий остров <span class="mystery">(???)</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 3: КАСТОМНЫЙ КОНТЕНТ (65%) + СТАТУС СЕРВЕРА И ТЕХАДМИНЫ -->
+    <section id="scene-3" class="scene" data-scene="3">
+      <div class="metric-container">
+        <div class="mask-clip">
+          <span id="s3-kicker" class="scene-kicker mono mask-inner">РАЗРАБОТКА</span>
+        </div>
+        <div class="mask-clip">
+          <h2 id="s3-title" class="scene-h2 mask-inner">Кастомный контент</h2>
+        </div>
+        <div class="mask-clip">
+          <p id="s3-sub" class="scene-sub mask-inner">Добавлено: новые баги.</p>
+        </div>
+
+        <div id="s3-prog" class="progress-block">
+          <div class="progress-meta">
+            <span class="progress-label mono">
+              Прогресс:<span id="s3-counter" class="progress-number">0%</span>
+            </span>
+            <span class="progress-ratio mono">65 / 100</span>
+          </div>
+          <div class="bar-track">
+            <div id="s3-bar" class="bar-fill"></div>
+          </div>
+        </div>
+
+        <!-- Server Status & Tech Admins Strip (Page 2 of Tracker) -->
+        <div id="s3-server-status" class="server-status-card">
+          <div class="server-stat-cell">
+            <span class="spec-label mono">Статус сервера</span>
+            <div class="status-live mono">
+              <span class="status-dot"></span>
+              <span class="accent">Работает</span>
+            </div>
+            <span class="spec-sub">Стабильная работа ядра</span>
+          </div>
+
+          <div class="server-stat-cell">
+            <span class="spec-label mono">Обновление</span>
+            <div class="status-value">Переход на <span class="status-tag mono">26.3</span></div>
+            <span class="spec-sub">Обновляются плагины</span>
+          </div>
+
+          <div class="server-stat-cell">
+            <span class="spec-label mono">Техадмины</span>
+            <div class="status-value mono"><span class="status-tag">utophii</span>, <span class="status-tag">Fenkovskiy</span></div>
+            <span class="spec-sub">Техническая часть и плагины</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 4: МЕДИА (41%) -->
+    <section id="scene-4" class="scene" data-scene="4">
+      <div class="metric-container">
+        <div class="mask-clip">
+          <span id="s4-kicker" class="scene-kicker mono mask-inner">МЕДИА</span>
+        </div>
+        <div class="mask-clip">
+          <div id="s4-title" class="media-heading-row mask-inner">
+            <h2 class="scene-h2">Медиа</h2>
+            <span class="media-live-dot"></span>
+          </div>
+        </div>
+        <div class="mask-clip">
+          <p id="s4-sub" class="scene-sub mask-inner">Сдвинулись с мёртвой точки.</p>
+        </div>
+
+        <div id="s4-prog" class="progress-block">
+          <div class="progress-meta">
+            <span class="progress-label mono">
+              Прогресс:<span id="s4-counter" class="progress-number">0%</span>
+            </span>
+            <span class="progress-ratio mono">41 / 100</span>
+          </div>
+          <div class="bar-track">
+            <div id="s4-bar" class="bar-fill pulse-tip"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 5: ЧТО ВАС СКОРО ЖДЁТ (2x2 GRID + 57% ГОТОВНОСТЬ СЕРВЕРА) -->
+    <section id="scene-5" class="scene" data-scene="5">
+      <div class="s5-wrap">
+        <div class="s5-header">
+          <div class="mask-clip">
+            <span id="s5-kicker" class="scene-kicker mono mask-inner">СКОРО</span>
+          </div>
+          <br />
+          <div class="mask-clip">
+            <h2 id="s5-title" class="scene-h2 mask-inner" style="font-size: clamp(1.85rem, 4.2vw, 3rem);">
+              Что вас скоро ждёт
+            </h2>
+          </div>
+        </div>
+
+        <div class="cards-grid">
+          <!-- Card 1 -->
+          <article id="s5-c1" class="feature-card">
+            <div class="card-top">
+              <div class="card-icon">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </div>
+              <span class="card-dot"></span>
+            </div>
+            <div>
+              <h3 class="card-title">Новые механики</h3>
+              <p class="card-desc">Переработанные системы и геймплейные фичи</p>
+              <p class="card-author mono">автор: <span class="accent">DmitriySM, Tarteen228</span></p>
+            </div>
+          </article>
+
+          <!-- Card 2 -->
+          <article id="s5-c2" class="feature-card">
+            <div class="card-top">
+              <div class="card-icon">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path>
+                  <path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7L19 16z"></path>
+                </svg>
+              </div>
+              <span class="card-dot"></span>
+            </div>
+            <div>
+              <h3 class="card-title">Новый визуал</h3>
+              <p class="card-desc">Уникальные образы и визуальные детали</p>
+              <p class="card-author mono">автор: <span class="accent">samicoppersi</span></p>
+            </div>
+          </article>
+
+          <!-- Card 3 -->
+          <article id="s5-c3" class="feature-card">
+            <div class="card-top">
+              <div class="card-icon">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                </svg>
+              </div>
+              <span class="card-dot"></span>
+            </div>
+            <div>
+              <h3 class="card-title">Спойлеры локаций</h3>
+              <p class="card-desc">Первые кадры ключевых точек мира</p>
+              <p class="card-author mono">автор: <span class="accent">Marki</span></p>
+            </div>
+          </article>
+
+          <!-- Card 4 -->
+          <article id="s5-c4" class="feature-card">
+            <div class="card-top">
+              <div class="card-icon amber">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="6" width="8" height="14" rx="4"></rect>
+                  <path d="M19 10h-3"></path>
+                  <path d="M8 10H5"></path>
+                  <path d="M19 15h-3"></path>
+                  <path d="M8 15H5"></path>
+                  <path d="M17 6l-2 2"></path>
+                  <path d="M7 6l2 2"></path>
+                  <path d="M12 6V3"></path>
+                </svg>
+              </div>
+              <span class="card-dot"></span>
+            </div>
+            <div>
+              <h3 class="card-title">Новые баги</h3>
+              <p class="card-desc">Свежая порция неожиданных фич и краш-тестов</p>
+              <p class="card-author mono">Новые баги: <span class="accent">(Antagon Dev)</span></p>
+            </div>
+          </article>
+        </div>
+
+        <!-- Server Readiness Bar (57%) -->
+        <div id="s5-fill-card" class="server-fill-card">
+          <div class="server-fill-head mono">
+            <span class="server-fill-title">Готовность сервера</span>
+            <span id="s5-fill-counter" class="server-fill-pct">0%</span>
+          </div>
+          <div class="bar-track">
+            <div id="s5-fill-bar" class="bar-fill"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 6: СВОДКА ГОТОВНОСТИ -->
+    <section id="scene-6" class="scene" data-scene="6">
+      <div class="s6-wrap">
+        <div class="s6-header">
+          <div class="mask-clip">
+            <span id="s6-kicker" class="scene-kicker mono mask-inner">СВОДКА ГОТОВНОСТИ</span>
+          </div>
+          <br />
+          <div class="mask-clip">
+            <h2 id="s6-title" class="scene-h2 mask-inner" style="font-size: clamp(1.9rem, 4.4vw, 3.1rem);">
+              Antagon: <span class="accent">Reborn</span>
+            </h2>
+          </div>
+        </div>
+
+        <div class="rings-grid">
+          <div id="s6-card-1" class="ring-card" data-interactive="true" data-jump="2">
+            <div class="ring-box">
+              <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"></circle>
+                <circle id="s6-ring-1" class="ring-fg" cx="50" cy="50" r="45"></circle>
+              </svg>
+              <span id="s6-val-1" class="ring-val mono">0%</span>
+            </div>
+            <h3 class="ring-title">Мир</h3>
+            <p class="ring-sub mono">5.5k диаметр</p>
+          </div>
+
+          <div id="s6-card-2" class="ring-card" data-interactive="true" data-jump="3">
+            <div class="ring-box">
+              <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"></circle>
+                <circle id="s6-ring-2" class="ring-fg white" cx="50" cy="50" r="45"></circle>
+              </svg>
+              <span id="s6-val-2" class="ring-val white mono">0%</span>
+            </div>
+            <h3 class="ring-title">Кастомный контент</h3>
+            <p class="ring-sub mono">Новые баги и системы</p>
+          </div>
+
+          <div id="s6-card-3" class="ring-card" data-interactive="true" data-jump="4">
+            <div class="ring-box">
+              <svg class="ring-svg" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"></circle>
+                <circle id="s6-ring-3" class="ring-fg" cx="50" cy="50" r="45"></circle>
+              </svg>
+              <span id="s6-val-3" class="ring-val mono">0%</span>
+            </div>
+            <h3 class="ring-title">Медиа</h3>
+            <p class="ring-sub mono">Сдвинулись с точки</p>
+          </div>
+        </div>
+
+        <button id="s6-capacity-pill" class="s6-capacity-pill mono" type="button" data-interactive="true" data-jump="5">
+          <span class="status-dot"></span>
+          <span>Готовность сервера — <strong class="accent">57%</strong></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- SCENE 7: ФИНАЛ -->
+    <section id="scene-7" class="scene" data-scene="7">
+      <div class="s7-wrap">
+        <div class="mask-clip">
+          <h2 id="s7-title" class="s7-title mask-inner">
+            ANTAGON: REBORN
+          </h2>
+        </div>
+        <p id="s7-sub" class="s7-sub mono">19 декабря</p>
+        <button id="s7-restart" class="s7-dot-btn" type="button" aria-label="Повторить презентацию" data-interactive="true">
+          <span class="s7-dot"></span>
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================
+       2. RIGHT-SIDE TRACKER PANEL (SCENES 2–7)
+       ======================================================================== -->
+  <aside id="tracker-panel" class="tracker-panel hidden" data-interactive="true" aria-label="re: antagon">
+    <div class="tracker-header">
+      <h2 class="tracker-title">re: antagon</h2>
+      <div class="tracker-header-right">
+        <span id="tracker-fraction" class="tracker-fraction mono">1 из 6</span>
+        <button id="btn-collapse" class="tracker-collapse-btn" type="button" title="Свернуть трекер (T)" aria-label="Свернуть трекер">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 6-Node Horizontal Progress Track -->
+    <div class="tracker-stepper">
+      <div class="stepper-rail-bg"></div>
+      <div id="stepper-fill" class="stepper-rail-fill"></div>
+      <div id="stepper-nodes" class="stepper-nodes"></div>
+    </div>
+
+    <!-- Dynamic Phase Info -->
+    <div id="tracker-phase" class="tracker-phase">
+      <h3 id="tracker-phase-title" class="tracker-phase-title">Мир</h3>
+      <p id="tracker-phase-desc" class="tracker-phase-desc">Генерация 5.5k, готовность 74%, острова (???)</p>
+    </div>
+
+    <!-- Clickable Telemetry List -->
+    <div class="tracker-telemetry">
+      <button type="button" class="telemetry-item" data-jump="2">
+        <div class="telemetry-head mono">
+          <span class="telemetry-name">Мир</span>
+          <span class="telemetry-val">74%</span>
+        </div>
+        <div class="telemetry-track">
+          <div class="telemetry-fill" style="width: 74%;"></div>
+        </div>
+      </button>
+
+      <button type="button" class="telemetry-item" data-jump="3">
+        <div class="telemetry-head mono">
+          <span class="telemetry-name">Кастомный контент</span>
+          <span class="telemetry-val white">65%</span>
+        </div>
+        <div class="telemetry-track">
+          <div class="telemetry-fill white" style="width: 65%;"></div>
+        </div>
+      </button>
+
+      <button type="button" class="telemetry-item" data-jump="4">
+        <div class="telemetry-head mono">
+          <span class="telemetry-name">Медиа</span>
+          <span class="telemetry-val">41%</span>
+        </div>
+        <div class="telemetry-track">
+          <div class="telemetry-fill" style="width: 41%;"></div>
+        </div>
+      </button>
+
+      <button type="button" class="telemetry-item" data-jump="5">
+        <div class="telemetry-head mono">
+          <span class="telemetry-name">Готовность сервера</span>
+          <span class="telemetry-val">57%</span>
+        </div>
+        <div class="telemetry-track">
+          <div class="telemetry-fill" style="width: 57%;"></div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Micro-Controls Row (Hidden with H for clean video capture) -->
+    <div class="tracker-controls">
+      <div class="ctrl-group">
+        <button id="btn-restart" class="ctrl-btn" type="button" title="Сначала (Сцена 1)">↺</button>
+        <button id="btn-prev" class="ctrl-btn" type="button" title="Назад (←)">‹</button>
+        <button id="btn-next" class="ctrl-btn" type="button" title="Вперёд (→ / Space)">›</button>
+      </div>
+      <button id="btn-auto" class="ctrl-btn" type="button" title="Автоплей (P)">▶ Авто</button>
+    </div>
+  </aside>
+
+  <!-- Subtle Right-Edge Reopen Button when Tracker is Collapsed -->
+  <button id="tracker-reopen" class="tracker-reopen" type="button" data-interactive="true" title="Показать трекер (T)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+    <span class="mono" style="font-size: 10px; letter-spacing: 0.18em; writing-mode: vertical-rl;">ТРЕКЕР</span>
+  </button>
+
+  <!-- ========================================================================
+       MORPHING TRANSITION FX OVERLAY
+       ======================================================================== -->
+  <div class="fx-layer" aria-hidden="true">
+    <div id="fx-radial" class="fx-radial"></div>
+    <div id="fx-scanner" class="fx-scanner"></div>
+    <div id="fx-morph-line" class="fx-morph-line"></div>
+    <div id="fx-dots" class="fx-dots">
+      <div id="fx-d1" class="fx-dot"></div>
+      <div id="fx-d2" class="fx-dot"></div>
+      <div id="fx-d3" class="fx-dot"></div>
+      <div id="fx-d4" class="fx-dot"></div>
+    </div>
+    <div id="fx-rings" class="fx-rings">
+      <div id="fx-r1" class="fx-ring"></div>
+      <div id="fx-r2" class="fx-ring white"></div>
+      <div id="fx-r3" class="fx-ring"></div>
+    </div>
+    <div id="fx-pulse-ring" class="fx-pulse-ring"></div>
+  </div>
+
+  <!-- Non-Intrusive Toast -->
+  <div id="toast" class="toast mono" role="status" aria-live="polite"></div>
+
+  <!-- ========================================================================
+       SELF-CONTAINED PRESENTATION ENGINE (ZERO EXTERNAL DEPENDENCIES)
+       ======================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* 6 Tracker Phases mapped 1-to-1 with Scenes 2..7 */
+      const PHASES = [
+        { id: 1, scene: 2, title: 'Мир', desc: 'Генерация 5.5k, готовность 74%, острова (???)' },
+        { id: 2, scene: 3, title: 'Кастомный контент', desc: 'Переход на 26.3 • Техадмины • Готовность 65%' },
+        { id: 3, scene: 4, title: 'Медиа', desc: 'Сдвинулись с мёртвой точки. Готовность 41%' },
+        { id: 4, scene: 5, title: 'Что вас ждёт', desc: 'Анонсы, команда и готовность сервера 57%' },
+        { id: 5, scene: 6, title: 'Сводка', desc: 'Общая готовность всех направлений' },
+        { id: 6, scene: 7, title: '19 декабря', desc: 'Финальный отсчёт до старта сезона' }
+      ];
+
+      /* Comfortable video-recording autoplay pacing (ms) */
+      const AUTO_DELAYS = {
+        1: 3800,
+        2: 8200,
+        3: 4500,
+        4: 4500,
+        5: 4500,
+        6: 4500,
+        7: 4000
+      };
+
+      const CIRCUMFERENCE = 282.743;
+
+      /* Application State */
+      const state = {
+        currentScene: 0,
+        totalScenes: 7,
+        autoPlay: true,
+        initialAutoRun: true,
+        controlsHidden: false,
+        trackerCollapsed: window.innerWidth < 1060,
+        activePhaseId: 1,
+        timeouts: [],
+        rafs: [],
+        autoTimer: null,
+        toastTimer: null
+      };
+
+      /* Strictly verified DOM references */
+      const dom = {
+        stage: document.getElementById('stage'),
+        toast: document.getElementById('toast'),
+
+        // Tracker Panel
+        trackerPanel: document.getElementById('tracker-panel'),
+        trackerReopen: document.getElementById('tracker-reopen'),
+        trackerFraction: document.getElementById('tracker-fraction'),
+        stepperFill: document.getElementById('stepper-fill'),
+        stepperNodes: document.getElementById('stepper-nodes'),
+        trackerPhase: document.getElementById('tracker-phase'),
+        trackerPhaseTitle: document.getElementById('tracker-phase-title'),
+        trackerPhaseDesc: document.getElementById('tracker-phase-desc'),
+        btnCollapse: document.getElementById('btn-collapse'),
+        btnRestart: document.getElementById('btn-restart'),
+        btnPrev: document.getElementById('btn-prev'),
+        btnNext: document.getElementById('btn-next'),
+        btnAuto: document.getElementById('btn-auto'),
+
+        // Scene 1
+        s1Title: document.getElementById('s1-title'),
+        s1Loader: document.getElementById('s1-loader'),
+        s1Ring: document.getElementById('s1-ring'),
+        s1Dot: document.getElementById('s1-dot'),
+
+        // Scene 2
+        s2Typewriter: document.getElementById('s2-typewriter'),
+        s2Line1: document.getElementById('s2-line-1'),
+        s2Cur1: document.getElementById('s2-cur-1'),
+        s2Line2: document.getElementById('s2-line-2'),
+        s2Cur2: document.getElementById('s2-cur-2'),
+        s2Line3: document.getElementById('s2-line-3'),
+        s2Cur3: document.getElementById('s2-cur-3'),
+        s2World: document.getElementById('s2-world'),
+        s2Counter: document.getElementById('s2-counter'),
+        s2Bar: document.getElementById('s2-bar'),
+
+        // Scene 3
+        s3Kicker: document.getElementById('s3-kicker'),
+        s3Title: document.getElementById('s3-title'),
+        s3Sub: document.getElementById('s3-sub'),
+        s3Prog: document.getElementById('s3-prog'),
+        s3Counter: document.getElementById('s3-counter'),
+        s3Bar: document.getElementById('s3-bar'),
+        s3ServerStatus: document.getElementById('s3-server-status'),
+
+        // Scene 4
+        s4Kicker: document.getElementById('s4-kicker'),
+        s4Title: document.getElementById('s4-title'),
+        s4Sub: document.getElementById('s4-sub'),
+        s4Prog: document.getElementById('s4-prog'),
+        s4Counter: document.getElementById('s4-counter'),
+        s4Bar: document.getElementById('s4-bar'),
+
+        // Scene 5
+        s5Kicker: document.getElementById('s5-kicker'),
+        s5Title: document.getElementById('s5-title'),
+        s5Cards: [
+          document.getElementById('s5-c1'),
+          document.getElementById('s5-c2'),
+          document.getElementById('s5-c3'),
+          document.getElementById('s5-c4')
+        ],
+        s5FillCard: document.getElementById('s5-fill-card'),
+        s5FillCounter: document.getElementById('s5-fill-counter'),
+        s5FillBar: document.getElementById('s5-fill-bar'),
+
+        // Scene 6
+        s6Kicker: document.getElementById('s6-kicker'),
+        s6Title: document.getElementById('s6-title'),
+        s6Cards: [
+          document.getElementById('s6-card-1'),
+          document.getElementById('s6-card-2'),
+          document.getElementById('s6-card-3')
+        ],
+        s6Rings: [
+          document.getElementById('s6-ring-1'),
+          document.getElementById('s6-ring-2'),
+          document.getElementById('s6-ring-3')
+        ],
+        s6Vals: [
+          document.getElementById('s6-val-1'),
+          document.getElementById('s6-val-2'),
+          document.getElementById('s6-val-3')
+        ],
+        s6CapacityPill: document.getElementById('s6-capacity-pill'),
+
+        // Scene 7
+        s7Title: document.getElementById('s7-title'),
+        s7Sub: document.getElementById('s7-sub'),
+        s7Restart: document.getElementById('s7-restart'),
+
+        // FX Layer
+        fxRadial: document.getElementById('fx-radial'),
+        fxScanner: document.getElementById('fx-scanner'),
+        fxMorphLine: document.getElementById('fx-morph-line'),
+        fxDots: document.getElementById('fx-dots'),
+        fxDotList: [
+          document.getElementById('fx-d1'),
+          document.getElementById('fx-d2'),
+          document.getElementById('fx-d3'),
+          document.getElementById('fx-d4')
+        ],
+        fxRings: document.getElementById('fx-rings'),
+        fxRingList: [
+          document.getElementById('fx-r1'),
+          document.getElementById('fx-r2'),
+          document.getElementById('fx-r3')
+        ],
+        fxPulseRing: document.getElementById('fx-pulse-ring')
+      };
+
+      /* ----------------------------------------------------------------------
+         CENTRALIZED TIMER & ANIMATION FRAME MANAGEMENT
+         ---------------------------------------------------------------------- */
+      function addTimeout(fn, delay) {
+        const id = window.setTimeout(() => {
+          state.timeouts = state.timeouts.filter((t) => t !== id);
+          fn();
+        }, delay);
+        state.timeouts.push(id);
+        return id;
+      }
+
+      function addRaf(fn) {
+        const id = window.requestAnimationFrame((now) => {
+          state.rafs = state.rafs.filter((r) => r !== id);
+          fn(now);
+        });
+        state.rafs.push(id);
+        return id;
+      }
+
+      function clearAllTimers() {
+        for (let i = 0; i < state.timeouts.length; i++) {
+          window.clearTimeout(state.timeouts[i]);
+        }
+        state.timeouts = [];
+
+        for (let i = 0; i < state.rafs.length; i++) {
+          window.cancelAnimationFrame(state.rafs[i]);
+        }
+        state.rafs = [];
+
+        if (state.autoTimer !== null) {
+          window.clearTimeout(state.autoTimer);
+          state.autoTimer = null;
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         TOAST HELPER
+         ---------------------------------------------------------------------- */
+      function showToast(text) {
+        if (state.controlsHidden) return;
+        dom.toast.textContent = text;
+        dom.toast.classList.add('show');
+        if (state.toastTimer !== null) window.clearTimeout(state.toastTimer);
+        state.toastTimer = window.setTimeout(() => {
+          dom.toast.classList.remove('show');
+          state.toastTimer = null;
+        }, 1900);
+      }
+
+      /* ----------------------------------------------------------------------
+         KINETIC HELPERS (COUNTER + FAST TYPEWRITER)
+         ---------------------------------------------------------------------- */
+      function animateCounter(el, target, duration) {
+        const start = performance.now();
+        function tick(now) {
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+          el.textContent = Math.round(eased * target) + '%';
+          if (progress < 1) {
+            addRaf(tick);
+          }
+        }
+        addRaf(tick);
+      }
+
+      function typeText(el, text, speedMs, onDone) {
+        el.textContent = '';
+        let idx = 0;
+        function step() {
+          if (idx < text.length) {
+            el.textContent += text.charAt(idx);
+            idx += 1;
+            addTimeout(step, speedMs);
+          } else if (onDone) {
+            onDone();
+          }
+        }
+        step();
+      }
+
+      /* ----------------------------------------------------------------------
+         RIGHT-SIDE TRACKER PANEL
+         ---------------------------------------------------------------------- */
+      function buildTrackerNodes() {
+        dom.stepperNodes.innerHTML = '';
+        PHASES.forEach((phase) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'step-node';
+          btn.dataset.phase = String(phase.id);
+          btn.title = `${phase.id} из 6: ${phase.title}`;
+          btn.setAttribute('aria-label', `Фаза ${phase.id}: ${phase.title}`);
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            goToScene(phase.scene);
+          });
+          dom.stepperNodes.appendChild(btn);
+        });
+      }
+
+      function renderTrackerPhase(phaseId, animateText) {
+        const phase = PHASES[phaseId - 1];
+        if (!phase) return;
+
+        state.activePhaseId = phaseId;
+        dom.trackerFraction.textContent = `${phaseId} из 6`;
+
+        const pct = ((phaseId - 1) / (PHASES.length - 1)) * 100;
+        dom.stepperFill.style.width = pct === 0 ? '0%' : `calc(${pct}% - 12px)`;
+
+        const nodes = dom.stepperNodes.querySelectorAll('.step-node');
+        nodes.forEach((node) => {
+          const id = Number(node.dataset.phase);
+          node.classList.remove('completed', 'active', 'upcoming');
+          node.innerHTML = '';
+
+          if (id < phaseId) {
+            node.classList.add('completed');
+            node.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+          } else if (id === phaseId) {
+            node.classList.add('active');
+            node.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#000000;display:block;"></span>';
+          } else {
+            node.classList.add('upcoming');
+          }
+        });
+
+        if (animateText) {
+          dom.trackerPhase.classList.add('switching');
+          addTimeout(() => {
+            dom.trackerPhaseTitle.textContent = phase.title;
+            dom.trackerPhaseDesc.textContent = phase.desc;
+            dom.trackerPhase.classList.remove('switching');
+          }, 150);
+        } else {
+          dom.trackerPhaseTitle.textContent = phase.title;
+          dom.trackerPhaseDesc.textContent = phase.desc;
+        }
+      }
+
+      function syncTrackerWithScene(sceneNum) {
+        const isIntro = sceneNum === 1;
+        const shouldShow = !isIntro && !state.trackerCollapsed;
+
+        document.body.classList.toggle('tracker-visible', shouldShow);
+        dom.trackerPanel.classList.toggle('hidden', !shouldShow);
+        dom.trackerReopen.classList.toggle('visible', !isIntro && state.trackerCollapsed);
+        dom.trackerPanel.classList.toggle('highlight-ring', sceneNum === 6);
+
+        if (!isIntro) {
+          const targetPhase = Math.min(6, Math.max(1, sceneNum - 1));
+          renderTrackerPhase(targetPhase, targetPhase !== state.activePhaseId);
+        }
+
+        const items = dom.trackerPanel.querySelectorAll('.telemetry-item');
+        items.forEach((item) => {
+          item.classList.toggle('current', Number(item.dataset.jump) === sceneNum);
+        });
+      }
+
+      function setTrackerCollapsed(collapsed, silent) {
+        state.trackerCollapsed = collapsed;
+        syncTrackerWithScene(state.currentScene || 1);
+        if (!silent) {
+          showToast(collapsed ? 'Трекер скрыт (T)' : 'Трекер открыт (T)');
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         RESET ALL SCENES & FX OVERLAYS CLEANLY
+         ---------------------------------------------------------------------- */
+      function resetFx() {
+        dom.fxRadial.style.transition = 'none';
+        dom.fxRadial.style.opacity = '0';
+        dom.fxRadial.style.transform = 'scale(0)';
+
+        dom.fxScanner.style.transition = 'none';
+        dom.fxScanner.style.opacity = '0';
+        dom.fxScanner.style.transform = 'translateX(105%)';
+
+        dom.fxMorphLine.style.transition = 'none';
+        dom.fxMorphLine.style.opacity = '0';
+        dom.fxMorphLine.style.width = '12px';
+        dom.fxMorphLine.style.height = '12px';
+        dom.fxMorphLine.style.transform = 'translate(-50%, -50%) scale(0)';
+
+        dom.fxDots.style.opacity = '0';
+        dom.fxDotList.forEach((d) => {
+          d.style.transition = 'none';
+          d.style.width = '10px';
+          d.style.height = '10px';
+          d.style.borderRadius = '50%';
+          d.style.backgroundColor = '#ffc26f';
+          d.style.opacity = '1';
+          d.style.transform = 'translate(0px, 0px)';
+        });
+
+        dom.fxRings.style.opacity = '0';
+        dom.fxRingList.forEach((r) => {
+          r.style.transition = 'none';
+          r.style.opacity = '0';
+          r.style.transform = 'translate(0px, 0px) scale(0.45)';
+        });
+
+        dom.fxPulseRing.style.transition = 'none';
+        dom.fxPulseRing.style.opacity = '0';
+        dom.fxPulseRing.style.transform = 'scale(0.4)';
+      }
+
+      function resetAllScenes() {
+        // Scene 1
+        dom.s1Title.classList.remove('revealed', 'swipe-up');
+        dom.s1Loader.classList.remove('visible');
+        dom.s1Ring.style.transition = 'none';
+        dom.s1Ring.style.strokeDashoffset = String(CIRCUMFERENCE);
+        dom.s1Dot.classList.remove('solid', 'compact');
+
+        // Scene 2
+        dom.s2Typewriter.classList.remove('exit-up');
+        dom.s2Line1.textContent = '';
+        dom.s2Line2.textContent = '';
+        dom.s2Line3.textContent = '';
+        dom.s2Cur1.classList.remove('off');
+        dom.s2Cur2.classList.add('off');
+        dom.s2Cur3.classList.add('off');
+        dom.s2World.classList.remove('revealed');
+        dom.s2Bar.style.transition = 'none';
+        dom.s2Bar.style.width = '0%';
+        dom.s2Counter.textContent = '0%';
+        document.querySelectorAll('.map-cross.open').forEach((c) => c.classList.remove('open'));
+
+        // Scene 3
+        dom.s3Kicker.classList.remove('revealed');
+        dom.s3Title.classList.remove('revealed');
+        dom.s3Sub.classList.remove('revealed');
+        dom.s3Prog.classList.remove('visible');
+        dom.s3Bar.style.transition = 'none';
+        dom.s3Bar.style.width = '0%';
+        dom.s3Counter.textContent = '0%';
+        dom.s3ServerStatus.classList.remove('visible');
+
+        // Scene 4
+        dom.s4Kicker.classList.remove('revealed');
+        dom.s4Title.classList.remove('revealed');
+        dom.s4Sub.classList.remove('revealed');
+        dom.s4Prog.classList.remove('visible');
+        dom.s4Bar.style.transition = 'none';
+        dom.s4Bar.style.width = '0%';
+        dom.s4Counter.textContent = '0%';
+
+        // Scene 5
+        dom.s5Kicker.classList.remove('revealed');
+        dom.s5Title.classList.remove('revealed');
+        dom.s5Cards.forEach((c) => {
+          c.classList.remove('visible', 'focused');
+          c.style.transition = '';
+          c.style.transform = '';
+          c.style.opacity = '';
+        });
+        dom.s5FillCard.classList.remove('visible');
+        dom.s5FillBar.style.transition = 'none';
+        dom.s5FillBar.style.width = '0%';
+        dom.s5FillCounter.textContent = '0%';
+
+        // Scene 6
+        dom.s6Kicker.classList.remove('revealed');
+        dom.s6Title.classList.remove('revealed');
+        dom.s6Cards.forEach((c) => c.classList.remove('visible'));
+        dom.s6Rings.forEach((r) => {
+          r.style.transition = 'none';
+          r.style.strokeDashoffset = String(CIRCUMFERENCE);
+        });
+        dom.s6Vals.forEach((v) => { v.textContent = '0%'; });
+        dom.s6CapacityPill.classList.remove('visible');
+
+        // Scene 7
+        dom.s7Title.classList.remove('revealed');
+        dom.s7Sub.classList.remove('visible');
+        dom.s7Restart.classList.remove('visible');
+      }
+
+      /* ----------------------------------------------------------------------
+         SCENE CHOREOGRAPHY
+         ---------------------------------------------------------------------- */
+      function activateScene(sceneNum) {
+        resetAllScenes();
+
+        const scenes = dom.stage.querySelectorAll('.scene');
+        scenes.forEach((el) => {
+          el.classList.toggle('active', Number(el.dataset.scene) === sceneNum);
+          el.style.transition = '';
+          el.style.opacity = '';
+          el.style.transform = '';
+        });
+
+        state.currentScene = sceneNum;
+        syncTrackerWithScene(sceneNum);
+
+        // Force reflow so fresh transitions always trigger cleanly
+        void dom.stage.offsetWidth;
+
+        if (sceneNum === 1) runScene1();
+        else if (sceneNum === 2) runScene2();
+        else if (sceneNum === 3) runScene3();
+        else if (sceneNum === 4) runScene4();
+        else if (sceneNum === 5) runScene5();
+        else if (sceneNum === 6) runScene6();
+        else if (sceneNum === 7) runScene7();
+
+        if (state.autoPlay && sceneNum !== 1) {
+          if (state.initialAutoRun && sceneNum === state.totalScenes) {
+            // Complete the first full automatic run on the final slide and hand control to the user
+            addTimeout(() => {
+              if (state.initialAutoRun && state.currentScene === state.totalScenes) {
+                state.initialAutoRun = false;
+                setAutoPlay(false, true);
+              }
+            }, 1600);
+          } else {
+            scheduleAutoNext(sceneNum);
+          }
+        }
+      }
+
+      function scheduleAutoNext(sceneNum) {
+        if (state.autoTimer !== null) window.clearTimeout(state.autoTimer);
+        state.autoTimer = window.setTimeout(() => {
+          state.autoTimer = null;
+          goToNext();
+        }, AUTO_DELAYS[sceneNum] || 4500);
+      }
+
+      /* Scene 1: "Re:Antagon" swipe-up -> SVG ring -> solid dot -> auto radial transition into Scene 2 */
+      function runScene1() {
+        addTimeout(() => dom.s1Title.classList.add('revealed'), 90);
+        addTimeout(() => dom.s1Title.classList.add('swipe-up'), 1120);
+
+        addTimeout(() => {
+          dom.s1Loader.classList.add('visible');
+          dom.s1Ring.style.transition = 'stroke-dashoffset 1.3s cubic-bezier(0.76, 0, 0.24, 1)';
+          void dom.s1Ring.offsetWidth;
+          dom.s1Ring.style.strokeDashoffset = '0';
+        }, 1550);
+
+        addTimeout(() => dom.s1Dot.classList.add('solid'), 2860);
+        addTimeout(() => {
+          dom.s1Dot.classList.remove('solid');
+          dom.s1Dot.classList.add('compact');
+        }, 3240);
+
+        addTimeout(() => {
+          if (state.currentScene === 1) {
+            goToScene(2);
+          }
+        }, 3750);
+      }
+
+      /* Scene 2: Fast Typewriter -> World Map + 74% Specs */
+      function runScene2() {
+        addTimeout(() => {
+          typeText(dom.s2Line1, 'привет', 60, () => {
+            addTimeout(() => {
+              dom.s2Cur1.classList.add('off');
+              dom.s2Cur2.classList.remove('off');
+              typeText(dom.s2Line2, 'у нас новый сезон скоро', 44, () => {
+                addTimeout(() => {
+                  dom.s2Cur2.classList.add('off');
+                  dom.s2Cur3.classList.remove('off');
+                  typeText(dom.s2Line3, '(снова)', 58, () => {
+                    addTimeout(() => {
+                      dom.s2Typewriter.classList.add('exit-up');
+                      addTimeout(() => {
+                        dom.s2World.classList.add('revealed');
+                        dom.s2Bar.style.transition = 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)';
+                        void dom.s2Bar.offsetWidth;
+                        dom.s2Bar.style.width = '74%';
+                        animateCounter(dom.s2Counter, 74, 1200);
+                      }, 280);
+                    }, 700);
+                  });
+                }, 260);
+              });
+            }, 260);
+          });
+        }, 140);
+      }
+
+      /* Scene 3: Кастомный контент (65%) + Статус сервера и техадмины */
+      function runScene3() {
+        addTimeout(() => dom.s3Kicker.classList.add('revealed'), 70);
+        addTimeout(() => dom.s3Title.classList.add('revealed'), 150);
+        addTimeout(() => dom.s3Sub.classList.add('revealed'), 320);
+        addTimeout(() => {
+          dom.s3Prog.classList.add('visible');
+          dom.s3Bar.style.transition = 'width 1.15s cubic-bezier(0.16, 1, 0.3, 1)';
+          void dom.s3Bar.offsetWidth;
+          dom.s3Bar.style.width = '65%';
+          animateCounter(dom.s3Counter, 65, 1150);
+        }, 520);
+        addTimeout(() => {
+          dom.s3ServerStatus.classList.add('visible');
+        }, 820);
+      }
+
+      /* Scene 4: Медиа (41%) */
+      function runScene4() {
+        addTimeout(() => dom.s4Kicker.classList.add('revealed'), 70);
+        addTimeout(() => dom.s4Title.classList.add('revealed'), 150);
+        addTimeout(() => dom.s4Sub.classList.add('revealed'), 320);
+        addTimeout(() => {
+          dom.s4Prog.classList.add('visible');
+          dom.s4Bar.style.transition = 'width 1.15s cubic-bezier(0.16, 1, 0.3, 1)';
+          void dom.s4Bar.offsetWidth;
+          dom.s4Bar.style.width = '41%';
+          animateCounter(dom.s4Counter, 41, 1150);
+        }, 520);
+      }
+
+      /* Scene 5: Что вас скоро ждёт (2x2 Grid + 57% Готовность сервера) */
+      function runScene5() {
+        addTimeout(() => dom.s5Kicker.classList.add('revealed'), 70);
+        addTimeout(() => dom.s5Title.classList.add('revealed'), 150);
+        dom.s5Cards.forEach((card, i) => {
+          addTimeout(() => card.classList.add('visible'), 240 + i * 115);
+          addTimeout(() => {
+            dom.s5Cards.forEach((c) => c.classList.remove('focused'));
+            card.classList.add('focused');
+          }, 1050 + i * 680);
+        });
+        addTimeout(() => {
+          dom.s5FillCard.classList.add('visible');
+          dom.s5FillBar.style.transition = 'width 1.15s cubic-bezier(0.16, 1, 0.3, 1)';
+          void dom.s5FillBar.offsetWidth;
+          dom.s5FillBar.style.width = '57%';
+          animateCounter(dom.s5FillCounter, 57, 1150);
+        }, 680);
+      }
+
+      /* Scene 6: Сводка готовности (74%, 65%, 41% + 57% Pill) */
+      function runScene6() {
+        const targets = [74, 65, 41];
+        addTimeout(() => dom.s6Kicker.classList.add('revealed'), 70);
+        addTimeout(() => dom.s6Title.classList.add('revealed'), 150);
+
+        dom.s6Cards.forEach((card, i) => {
+          addTimeout(() => {
+            card.classList.add('visible');
+            const ring = dom.s6Rings[i];
+            ring.style.transition = 'stroke-dashoffset 1.25s cubic-bezier(0.16, 1, 0.3, 1)';
+            void ring.offsetWidth;
+            ring.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - targets[i] / 100));
+            animateCounter(dom.s6Vals[i], targets[i], 1250);
+          }, 260 + i * 150);
+        });
+
+        addTimeout(() => {
+          dom.s6CapacityPill.classList.add('visible');
+        }, 760);
+      }
+
+      /* Scene 7: Финал */
+      function runScene7() {
+        addTimeout(() => dom.s7Title.classList.add('revealed'), 140);
+        addTimeout(() => dom.s7Sub.classList.add('visible'), 780);
+        addTimeout(() => dom.s7Restart.classList.add('visible'), 1250);
+      }
+
+      /* ----------------------------------------------------------------------
+         INTERRUPTIBLE MORPHING TRANSITIONS (goToScene)
+         ---------------------------------------------------------------------- */
+      function goToScene(targetScene) {
+        if (targetScene < 1 || targetScene > state.totalScenes) return;
+        if (targetScene === state.currentScene) return;
+
+        clearAllTimers();
+        resetFx();
+
+        const from = state.currentScene;
+        const to = targetScene;
+
+        // Initial boot directly into Scene 1
+        if (from === 0) {
+          activateScene(to);
+          return;
+        }
+
+        // 1 -> 2: Radial dot expansion from center
+        if (from === 1 && to === 2) {
+          dom.fxRadial.style.opacity = '1';
+          dom.fxRadial.style.transform = 'scale(0.8)';
+          void dom.fxRadial.offsetWidth;
+
+          dom.fxRadial.style.transition = 'transform 0.48s cubic-bezier(0.76, 0, 0.24, 1), opacity 0.48s ease';
+          dom.fxRadial.style.transform = 'scale(140)';
+
+          addTimeout(() => {
+            activateScene(2);
+            dom.fxRadial.style.transition = 'opacity 0.38s ease';
+            dom.fxRadial.style.opacity = '0';
+            addTimeout(resetFx, 400);
+          }, 420);
+          return;
+        }
+
+        // 2 -> 3: Crisp vertical amber/white scanner wipe
+        if (from === 2 && to === 3) {
+          dom.fxScanner.style.opacity = '1';
+          void dom.fxScanner.offsetWidth;
+          dom.fxScanner.style.transition = 'transform 0.38s cubic-bezier(0.76, 0, 0.24, 1)';
+          dom.fxScanner.style.transform = 'translateX(0%)';
+
+          addTimeout(() => {
+            activateScene(3);
+            dom.fxScanner.style.transition = 'transform 0.4s cubic-bezier(0.76, 0, 0.24, 1)';
+            dom.fxScanner.style.transform = 'translateX(-105%)';
+            addTimeout(resetFx, 420);
+          }, 380);
+          return;
+        }
+
+        // 3 -> 4: Smooth horizontal morph into center amber dot
+        if (from === 3 && to === 4) {
+          const sc3 = document.getElementById('scene-3');
+          sc3.style.transition = 'opacity 0.2s ease';
+          sc3.style.opacity = '0';
+
+          dom.fxMorphLine.style.opacity = '1';
+          dom.fxMorphLine.style.width = '50vw';
+          dom.fxMorphLine.style.height = '2px';
+          dom.fxMorphLine.style.transform = 'translate(-50%, -50%) scale(1)';
+          void dom.fxMorphLine.offsetWidth;
+
+          dom.fxMorphLine.style.transition = 'width 0.32s cubic-bezier(0.76, 0, 0.24, 1), height 0.32s ease, transform 0.32s ease';
+          dom.fxMorphLine.style.width = '14px';
+          dom.fxMorphLine.style.height = '14px';
+          dom.fxMorphLine.style.transform = 'translate(-50%, -50%) scale(1.35)';
+
+          addTimeout(() => {
+            activateScene(4);
+            dom.fxMorphLine.style.transition = 'transform 0.26s ease, opacity 0.26s ease';
+            dom.fxMorphLine.style.transform = 'translate(-50%, -50%) scale(0)';
+            dom.fxMorphLine.style.opacity = '0';
+            addTimeout(resetFx, 280);
+          }, 320);
+          return;
+        }
+
+        // 4 -> 5: Single dot splits into 4 guides for the 2x2 grid
+        if (from === 4 && to === 5) {
+          const sc4 = document.getElementById('scene-4');
+          sc4.style.transition = 'opacity 0.2s ease';
+          sc4.style.opacity = '0';
+
+          dom.fxDots.style.opacity = '1';
+          const spreadX = Math.min(window.innerWidth * 0.13, 145);
+          const spreadY = 78;
+
+          addTimeout(() => {
+            dom.fxDotList.forEach((d) => {
+              d.style.transition = 'transform 0.32s cubic-bezier(0.76, 0, 0.24, 1)';
+            });
+            dom.fxDotList[0].style.transform = `translate(${-spreadX}px, ${-spreadY}px)`;
+            dom.fxDotList[1].style.transform = `translate(${spreadX}px, ${-spreadY}px)`;
+            dom.fxDotList[2].style.transform = `translate(${-spreadX}px, ${spreadY}px)`;
+            dom.fxDotList[3].style.transform = `translate(${spreadX}px, ${spreadY}px)`;
+
+            addTimeout(() => {
+              dom.fxDotList.forEach((d) => {
+                d.style.transition = 'width 0.32s cubic-bezier(0.16, 1, 0.3, 1), height 0.32s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.32s ease, background-color 0.2s ease, opacity 0.32s ease';
+                d.style.width = '136px';
+                d.style.height = '104px';
+                d.style.borderRadius = '16px';
+                d.style.backgroundColor = 'transparent';
+                d.style.opacity = '0';
+              });
+              activateScene(5);
+              addTimeout(resetFx, 340);
+            }, 310);
+          }, 110);
+          return;
+        }
+
+        // 5 -> 6: Cards and readiness bar collapse smoothly into 3 readiness rings
+        if (from === 5 && to === 6) {
+          const sc5 = document.getElementById('scene-5');
+          const spread = Math.min(window.innerWidth * 0.17, 210);
+          sc5.style.transition = 'opacity 0.28s ease';
+          sc5.style.opacity = '0';
+          dom.s5Cards.forEach((c) => {
+            c.style.transition = 'transform 0.3s cubic-bezier(0.76, 0, 0.24, 1), opacity 0.26s ease';
+            c.style.transform = 'scale(0.68)';
+            c.style.opacity = '0';
+          });
+          dom.s5FillCard.style.transition = 'transform 0.28s ease, opacity 0.24s ease';
+          dom.s5FillCard.style.transform = 'scale(0.92)';
+          dom.s5FillCard.style.opacity = '0';
+
+          dom.fxRings.style.opacity = '1';
+          dom.fxRingList[0].style.transform = `translate(${-spread}px, 0px) scale(0.45)`;
+          dom.fxRingList[1].style.transform = 'translate(0px, 0px) scale(0.45)';
+          dom.fxRingList[2].style.transform = `translate(${spread}px, 0px) scale(0.45)`;
+          void dom.fxRings.offsetWidth;
+
+          dom.fxRingList.forEach((r, idx) => {
+            const x = idx === 0 ? -spread : idx === 2 ? spread : 0;
+            r.style.transition = 'transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.32s ease';
+            r.style.opacity = '0.9';
+            r.style.transform = `translate(${x}px, 0px) scale(1.04)`;
+          });
+
+          addTimeout(() => {
+            dom.s5FillCard.style.transition = '';
+            dom.s5FillCard.style.transform = '';
+            dom.s5FillCard.style.opacity = '';
+            activateScene(6);
+            dom.fxRingList.forEach((r) => {
+              r.style.transition = 'opacity 0.28s ease';
+              r.style.opacity = '0';
+            });
+            addTimeout(resetFx, 300);
+          }, 360);
+          return;
+        }
+
+        // 6 -> 7: Expanding luminous ring transition
+        if (from === 6 && to === 7) {
+          const sc6 = document.getElementById('scene-6');
+          sc6.style.transition = 'opacity 0.32s ease, transform 0.38s cubic-bezier(0.76, 0, 0.24, 1)';
+          sc6.style.opacity = '0';
+          sc6.style.transform = 'scale(0.9)';
+
+          dom.fxPulseRing.style.opacity = '0.95';
+          dom.fxPulseRing.style.transform = 'scale(0.4)';
+          void dom.fxPulseRing.offsetWidth;
+
+          dom.fxPulseRing.style.transition = 'transform 0.54s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.54s ease';
+          dom.fxPulseRing.style.transform = 'scale(26)';
+          dom.fxPulseRing.style.opacity = '0';
+
+          addTimeout(() => {
+            activateScene(7);
+            addTimeout(resetFx, 340);
+          }, 320);
+          return;
+        }
+
+        // Clean AMOLED fade for direct jumps or backward navigation
+        const fromEl = document.getElementById(`scene-${from}`);
+        if (fromEl) {
+          fromEl.style.transition = 'opacity 0.22s ease';
+          fromEl.style.opacity = '0';
+        }
+        addTimeout(() => {
+          activateScene(to);
+        }, 220);
+      }
+
+      /* ----------------------------------------------------------------------
+         NAVIGATION & CONTROLS
+         ---------------------------------------------------------------------- */
+      function goToNext() {
+        const next = state.currentScene >= state.totalScenes ? 1 : state.currentScene + 1;
+        goToScene(next);
+      }
+
+      function goToPrev() {
+        const prev = state.currentScene <= 1 ? state.totalScenes : state.currentScene - 1;
+        goToScene(prev);
+      }
+
+      function setAutoPlay(enabled, silent) {
+        state.autoPlay = enabled;
+        if (!enabled) {
+          state.initialAutoRun = false;
+        }
+        dom.btnAuto.classList.toggle('active-auto', enabled);
+        dom.btnAuto.textContent = enabled ? '❚❚ Пауза' : '▶ Авто';
+
+        if (state.autoTimer !== null) {
+          window.clearTimeout(state.autoTimer);
+          state.autoTimer = null;
+        }
+
+        if (enabled) {
+          if (!silent) showToast('Автоплей включён (H — скрыть кнопки)');
+          if (state.currentScene > 1) {
+            scheduleAutoNext(state.currentScene);
+          }
+        } else {
+          if (!silent) showToast('Автоплей на паузе');
+        }
+      }
+
+      function toggleControls() {
+        state.controlsHidden = !state.controlsHidden;
+        document.body.classList.toggle('controls-hidden', state.controlsHidden);
+        if (!state.controlsHidden) {
+          showToast('Кнопки трекера показаны (H)');
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         EVENT LISTENERS
+         ---------------------------------------------------------------------- */
+      dom.btnRestart.addEventListener('click', (e) => { e.stopPropagation(); goToScene(1); });
+      dom.btnPrev.addEventListener('click', (e) => { e.stopPropagation(); goToPrev(); });
+      dom.btnNext.addEventListener('click', (e) => { e.stopPropagation(); goToNext(); });
+      dom.btnAuto.addEventListener('click', (e) => { e.stopPropagation(); setAutoPlay(!state.autoPlay); });
+      dom.btnCollapse.addEventListener('click', (e) => { e.stopPropagation(); setTrackerCollapsed(true); });
+      dom.trackerReopen.addEventListener('click', (e) => { e.stopPropagation(); setTrackerCollapsed(false); });
+      dom.s7Restart.addEventListener('click', (e) => { e.stopPropagation(); goToScene(1); });
+
+      document.querySelectorAll('[data-jump]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const target = Number(el.dataset.jump);
+          if (target) goToScene(target);
+        });
+      });
+
+      dom.stage.addEventListener('click', (e) => {
+        if (e.target.closest('[data-interactive="true"]')) return;
+        goToNext();
+      });
+
+      window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (e.code === 'Space' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          goToNext();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          goToPrev();
+        } else if (key === 'p' || key === 'з') {
+          e.preventDefault();
+          setAutoPlay(!state.autoPlay);
+        } else if (key === 'h' || key === 'р') {
+          e.preventDefault();
+          toggleControls();
+        } else if (key === 't' || key === 'е') {
+          e.preventDefault();
+          setTrackerCollapsed(!state.trackerCollapsed);
+        } else if (e.key >= '1' && e.key <= '7') {
+          goToScene(Number(e.key));
+        }
+      });
+
+      // Touch swipe support on main stage
+      let touchX = 0;
+      let touchY = 0;
+      dom.stage.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        touchX = e.touches[0].clientX;
+        touchY = e.touches[0].clientY;
+      }, { passive: true });
+
+      dom.stage.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - touchX;
+        const dy = e.changedTouches[0].clientY - touchY;
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
+          if (dx < 0) goToNext();
+          else goToPrev();
+        }
+      }, { passive: true });
+
+      // Interactive tap support for map crosses on touchscreens
+      document.querySelectorAll('.map-cross').forEach((cross) => {
+        cross.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const wasOpen = cross.classList.contains('open');
+          document.querySelectorAll('.map-cross.open').forEach((c) => c.classList.remove('open'));
+          if (!wasOpen) cross.classList.add('open');
+        });
+      });
+
+      /* ----------------------------------------------------------------------
+         BOOT
+         ---------------------------------------------------------------------- */
+      window.addEventListener('load', () => {
+        buildTrackerNodes();
+        renderTrackerPhase(1, false);
+        setAutoPlay(true, true);
+        goToScene(1);
+      });
+    })();
+  </script>
+</body>
+</html>
