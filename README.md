@@ -1,5 +1,4 @@
 # antagon-tracker
-incredible project defined with "sapnis"
 
 # Re:Antagon • Sapnis
 
